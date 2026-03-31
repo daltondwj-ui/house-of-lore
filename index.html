@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="House of Lore"/>
+<title>House of Lore · Lorcana Tools</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet"/>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#0e0b07;color:#e8dcc8;font-family:'Crimson Pro',Georgia,serif;overscroll-behavior:none}
+#root{min-height:100vh;display:flex;flex-direction:column;max-width:700px;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:translateX(0)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes scanLine{0%{left:6%;opacity:1}48%{opacity:1}50%{left:94%;opacity:0}51%{left:6%;opacity:0}53%{opacity:1}100%{left:94%;opacity:1}}
+@keyframes cornerGlow{0%,100%{opacity:1}50%{opacity:.5;box-shadow:0 0 10px 2px rgba(200,169,110,.45)}}
+.hol-float{animation:float 4.5s ease-in-out infinite}
+.hol-btn{transition:opacity .15s,transform .15s;cursor:pointer;font-family:'Crimson Pro',Georgia,serif}
+.hol-btn:active{opacity:.8;transform:scale(.97)}
+.hol-row:hover{background:rgba(200,169,110,.04)!important}
+.hol-item{animation:slideIn .25s cubic-bezier(.16,1,.3,1) forwards}
+.hol-fade{animation:fadeUp .35s cubic-bezier(.16,1,.3,1) forwards}
+.hol-corner{animation:cornerGlow 2.4s ease-in-out infinite}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:rgba(200,169,110,.15);border-radius:4px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#c8a96e;cursor:pointer}
+input:focus,select:focus{border-color:rgba(200,169,110,.45)!important;outline:none}
+.inp{width:100%;background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.15);border-radius:8px;padding:9px 12px;color:#e8dcc8;font-size:14px;outline:none;font-family:'Crimson Pro',Georgia,serif}
+.inp-sm{background:rgba(200,169,110,.08);border:1px solid rgba(200,169,110,.2);border-radius:7px;padding:5px 8px;color:#e8dcc8;font-size:13px;outline:none;font-family:'Crimson Pro',Georgia,serif;text-align:right;width:100%}
+.inp-sm:focus{border-color:rgba(200,169,110,.5);background:rgba(200,169,110,.12)}
+.inp-sm::placeholder,.inp::placeholder{color:#3a3020}
+select option{background:#1a1208;color:#e8dcc8}
+video{display:block}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(200,169,110,.2);border-radius:4px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+const {useState,useEffect,useMemo,useRef,useCallback}=React;
+const e=React.createElement;
+
+// ── Constants ─────────────────────────────────────────────────────────────────
+const CONDITIONS=["Mint","Near Mint","Lightly Played","Moderately Played","Heavily Played"];
+const PLATFORMS=["TCGplayer","eBay","Local","Facebook","Discord","Other"];
+const SETS=["The First Chapter","Rise of the Floodborn","Into the Inklands","Ursula's Return","Shimmering Skies","Azurite Sea","Archazia's Island","Reign of Jafar","Mixed","Other"];
+const COND_C={"Mint":"#4ade80","Near Mint":"#86efac","Lightly Played":"#fde047","Moderately Played":"#fb923c","Heavily Played":"#f87171"};
+const INK_C={Amber:"#d97706",Amethyst:"#7c3aed",Emerald:"#059669",Ruby:"#dc2626",Sapphire:"#2563eb",Steel:"#64748b"};
+const P="#c8a96e",P2="#a07840",BD="rgba(200,169,110,0.15)",SF="rgba(200,169,110,0.05)";
+const TODAY=new Date().toISOString().split("T")[0];
+const fmt=n=>(n===""||n===null||n===undefined||isNaN(Number(n)))?"—":"$"+Number(n).toFixed(2);
+
+// ── Local Storage helpers ─────────────────────────────────────────────────────
+function loadLS(key,fallback){try{const v=localStorage.getItem(key);return v?JSON.parse(v):fallback;}catch{return fallback;}}
+function saveLS(key,val){try{localStorage.setItem(key,JSON.stringify(val));}catch{}}
+
+// ── Logo ──────────────────────────────────────────────────────────────────────
+function Logo({size=44}){
+  return e("svg",{width:size,height:size,viewBox:"0 0 200 200",fill:"none"},
+    e("ellipse",{cx:"100",cy:"150",rx:"72",ry:"12",fill:"#1a1208"}),
+    e("path",{d:"M28 150 Q100 134 172 150",stroke:P,strokeWidth:"1.5",fill:"none"}),
+    e("path",{d:"M28 150 L28 158 Q100 144 172 158 L172 150",fill:"#2a1f0e"}),
+    e("path",{d:"M28 150 Q60 122 100 120",stroke:P,strokeWidth:"1.2",fill:"none"}),
+    e("path",{d:"M172 150 Q140 122 100 120",stroke:P,strokeWidth:"1.2",fill:"none"}),
+    e("rect",{x:"82",y:"90",width:"36",height:"38",fill:P}),
+    e("path",{d:"M94 128 L94 115 Q100 111 106 115 L106 128Z",fill:"#1a1208"}),
+    e("rect",{x:"87",y:"98",width:"8",height:"6",rx:"4",fill:"#1a1208"}),
+    e("rect",{x:"105",y:"98",width:"8",height:"6",rx:"4",fill:"#1a1208"}),
+    e("rect",{x:"88",y:"62",width:"24",height:"32",fill:"#b8965e"}),
+    e("polygon",{points:"100,30 88,62 112,62",fill:P2}),
+    e("rect",{x:"72",y:"80",width:"16",height:"22",fill:"#b8965e"}),
+    e("polygon",{points:"80,58 72,80 88,80",fill:P2}),
+    e("rect",{x:"112",y:"80",width:"16",height:"22",fill:"#b8965e"}),
+    e("polygon",{points:"120,58 112,80 128,80",fill:P2}),
+    e("rect",{x:"94",y:"70",width:"12",height:"10",rx:"6",fill:"#1a1208"}),
+    e("rect",{x:"76",y:"86",width:"8",height:"7",rx:"4",fill:"#1a1208"}),
+    e("rect",{x:"116",y:"86",width:"8",height:"7",rx:"4",fill:"#1a1208"}),
+    e("path",{d:"M55 97 Q38 80 50 64 Q60 50 72 60",stroke:P,strokeWidth:"2",fill:"none",strokeLinecap:"round",opacity:".65"}),
+    e("path",{d:"M145 97 Q162 80 150 64 Q140 50 128 60",stroke:P,strokeWidth:"2",fill:"none",strokeLinecap:"round",opacity:".65"}),
+    ...[[46,74],[60,52],[154,70],[138,48],[100,40]].map(([x,y],i)=>e("g",{key:i,transform:`translate(${x},${y})`},
+      e("line",{x1:"0",y1:"-4",x2:"0",y2:"4",stroke:P,strokeWidth:"1",opacity:".5"}),
+      e("line",{x1:"-4",y1:"0",x2:"4",y2:"0",stroke:P,strokeWidth:"1",opacity:".5"})
+    )),
+    e("path",{d:"M42 140 Q50 122 60 108 Q64 100 59 118 Q55 132 64 130",stroke:P,strokeWidth:"1.5",fill:"none",strokeLinecap:"round",opacity:".75"}),
+    e("rect",{x:"34",y:"134",width:"10",height:"13",rx:"2",fill:"#2a1f0e",stroke:P,strokeWidth:"1"}),
+    e("rect",{x:"36",y:"132",width:"6",height:"4",rx:"1",fill:P,opacity:".4"})
+  );
+}
+
+// ── Shared UI ─────────────────────────────────────────────────────────────────
+function Badge({status}){
+  const m={held:{bg:"rgba(74,222,128,.1)",c:"#4ade80",b:"1px solid rgba(74,222,128,.2)",l:"Held"},"listed-ebay":{bg:"rgba(124,58,237,.12)",c:"#a78bfa",b:"1px solid rgba(124,58,237,.25)",l:"eBay"},"listed-tcgplayer":{bg:"rgba(56,189,248,.1)",c:"#38bdf8",b:"1px solid rgba(56,189,248,.22)",l:"TCGplayer"},sold:{bg:"rgba(251,146,60,.1)",c:"#fb923c",b:"1px solid rgba(251,146,60,.22)",l:"Sold"}};
+  const s=m[status]||m.held;
+  return e("span",{style:{padding:"2px 9px",borderRadius:20,fontSize:10,fontWeight:700,letterSpacing:".07em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",background:s.bg,color:s.c,border:s.b}},s.l);
+}
+function StatCard({label,value,sub,accent}){
+  return e("div",{style:{background:SF,border:`1px solid ${BD}`,borderRadius:13,padding:"15px 16px",flex:1,minWidth:110,position:"relative",overflow:"hidden"}},
+    e("div",{style:{position:"absolute",top:0,left:0,right:0,height:2,background:accent,opacity:.9}}),
+    e("div",{style:{fontSize:9,color:"#5a4a30",letterSpacing:".12em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",marginBottom:4}},label),
+    e("div",{style:{fontSize:20,fontWeight:700,color:P,fontFamily:"'Cinzel',serif",lineHeight:1}},value),
+    sub&&e("div",{style:{fontSize:10,color:"#4a3a20",marginTop:3,fontStyle:"italic"}},sub)
+  );
+}
+function Modal({open,onClose,children}){
+  if(!open)return null;
+  return e("div",{style:{position:"fixed",inset:0,background:"rgba(0,0,0,.9)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:16},onClick:onClose},
+    e("div",{style:{background:"#100d08",border:`1px solid ${BD}`,borderRadius:20,padding:24,width:"100%",maxWidth:500,maxHeight:"88vh",overflowY:"auto"},onClick:ev=>ev.stopPropagation()},children)
+  );
+}
+function Field({label,children}){
+  return e("div",{style:{marginBottom:12}},
+    e("label",{style:{display:"block",fontSize:9,color:"#5a4a30",letterSpacing:".12em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",marginBottom:4}},label),
+    children
+  );
+}
+function Divider(){return e("div",{style:{height:1,background:`linear-gradient(90deg,transparent,${BD},transparent)`,margin:"4px 0"}});}
+function Spin(){return e("div",{style:{width:14,height:14,border:"2px solid rgba(200,169,110,.2)",borderTopColor:P,borderRadius:"50%",animation:"spin .8s linear infinite",display:"inline-block",verticalAlign:"middle"}});}
+
+// ── API helper ────────────────────────────────────────────────────────────────
+async function callClaude(prompt,maxTokens=3000){
+  const res=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:maxTokens,messages:[{role:"user",content:prompt}]})
+  });
+  const data=await res.json();
+  return data.content?.map(b=>b.text||"").join("")||"";
+}
+
+// ── SCANNER TAB ───────────────────────────────────────────────────────────────
+function ScannerTab({onAddToQuoter}){
+  const videoRef=useRef(null),canvasRef=useRef(null),streamRef=useRef(null);
+  const [phase,setPhase]=useState("idle");
+  const [scanning,setScanning]=useState(false);
+  const [flash,setFlash]=useState(false);
+  const [camReady,setCamReady]=useState(false);
+  const [errMsg,setErrMsg]=useState("");
+  const [lastScanned,setLastScanned]=useState(null);
+  const [addedCount,setAddedCount]=useState(0);
+
+  const startCam=useCallback(async()=>{
+    try{
+      const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:"environment"},width:{ideal:720},height:{ideal:1280},aspectRatio:{ideal:9/16}}});
+      streamRef.current=stream;
+      if(videoRef.current){videoRef.current.srcObject=stream;videoRef.current.onloadedmetadata=()=>{videoRef.current.play();setCamReady(true);setPhase("live");};}
+    }catch{setErrMsg("Camera access denied. Please allow camera access for this site in Safari settings.");setPhase("error");}
+  },[]);
+
+  const stopCam=useCallback(()=>{
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    streamRef.current=null;setCamReady(false);
+  },[]);
+
+  useEffect(()=>()=>stopCam(),[]);
+
+  const capture=useCallback(async()=>{
+    if(!videoRef.current||!canvasRef.current||!camReady||scanning)return;
+    setFlash(true);setTimeout(()=>setFlash(false),150);
+    setScanning(true);
+    const v=videoRef.current,c=canvasRef.current;
+    c.width=v.videoWidth||720;c.height=v.videoHeight||1280;
+    c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+    const b64=c.toDataURL("image/jpeg",.85).split(",")[1];
+    try{
+      const res=await fetch("https://api.anthropic.com/v1/messages",{
+        method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:600,messages:[{role:"user",content:[
+          {type:"image",source:{type:"base64",media_type:"image/jpeg",data:b64}},
+          {type:"text",text:'Disney Lorcana expert. Identify the card.\nReturn ONLY raw JSON, no markdown:\n{"found":true,"name":"exact name","set":"set name","condition":"Mint|Near Mint|Lightly Played|Moderately Played|Heavily Played","rarity":"Common|Uncommon|Rare|Super Rare|Legendary|Enchanted","inkColor":"Amber|Amethyst|Emerald|Ruby|Sapphire|Steel","marketPrice":4.50,"confidence":"High|Medium|Low","conditionNotes":"max 6 words"}\nIf no Lorcana card: {"found":false}'}
+        ]}]})
+      });
+      const data=await res.json();
+      const text=data.content?.map(b=>b.text||"").join("")||"";
+      const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
+      if(!parsed.found){setErrMsg("No card detected — try better lighting or angle.");} 
+      else{setErrMsg("");setLastScanned(parsed);}
+    }catch{setErrMsg("Scan failed. Check connection.");}
+    setScanning(false);
+  },[camReady,scanning]);
+
+  const addToQuoter=()=>{
+    if(!lastScanned)return;
+    onAddToQuoter({
+      id:Date.now()+Math.random(),
+      name:lastScanned.name,
+      set:lastScanned.set||"",
+      condition:lastScanned.condition||"Near Mint",
+      market:lastScanned.marketPrice!=null?String(lastScanned.marketPrice):"",
+      rarity:lastScanned.rarity||"",
+      inkColor:lastScanned.inkColor||"",
+      confidence:lastScanned.confidence||"Low",
+      looked:true
+    });
+    setAddedCount(n=>n+1);
+    setLastScanned(null);
+  };
+
+  const fullReset=()=>{stopCam();setLastScanned(null);setErrMsg("");setPhase("idle");setAddedCount(0);};
+
+  const corners=[{top:"5%",left:"5%",borderTop:`2px solid ${P}`,borderLeft:`2px solid ${P}`},{top:"5%",right:"5%",borderTop:`2px solid ${P}`,borderRight:`2px solid ${P}`},{bottom:"5%",left:"5%",borderBottom:`2px solid ${P}`,borderLeft:`2px solid ${P}`},{bottom:"5%",right:"5%",borderBottom:`2px solid ${P}`,borderRight:`2px solid ${P}`}];
+
+  if(phase==="idle") return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"40px 24px",gap:22,textAlign:"center"}},
+    e("div",{className:"hol-float"},e(Logo,{size:80})),
+    e("div",null,
+      e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:20,fontWeight:700,color:P,marginBottom:8}},"Card Scanner"),
+      e("div",{style:{fontSize:14,color:"#7a6a50",lineHeight:1.7}},"Point at a Lorcana card, tap scan.",e("br"),"Cards are added to your Quoter list",e("br"),"so you can price and deal as a batch.")
+    ),
+    e("div",{style:{width:"100%",height:1,background:`linear-gradient(90deg,transparent,${BD},transparent)`}}),
+    e("button",{onClick:startCam,className:"hol-btn",style:{background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:14,padding:"15px 0",fontSize:15,fontWeight:700,fontFamily:"'Cinzel',serif",width:"100%",maxWidth:280,boxShadow:`0 4px 24px rgba(200,169,110,.22)`}},"✦ Open Camera"),
+    e("div",{style:{fontSize:12,color:"#3a3020"}},"Requires camera permission in Safari")
+  );
+
+  if(phase==="error") return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:20,textAlign:"center"}},
+    e("div",{style:{fontSize:44,opacity:.5}},"📜"),
+    e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,color:"#c87171",marginBottom:6}},"The Lore is Unclear"),
+    e("div",{style:{fontSize:13,color:"#5a4a30",lineHeight:1.7}},errMsg),
+    e("button",{onClick:()=>setPhase("idle"),className:"hol-btn",style:{marginTop:8,background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:10,padding:"11px 28px",fontSize:13,fontWeight:700,fontFamily:"'Cinzel',serif"}},"Try Again")
+  );
+
+  return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",width:"100%",padding:"12px 14px",gap:10}},
+    e("canvas",{ref:canvasRef,style:{display:"none"}}),
+
+    // Camera viewfinder
+    e("div",{style:{width:"100%",maxWidth:300,aspectRatio:"2.5/3.5",position:"relative",borderRadius:14,overflow:"hidden",border:`1px solid ${BD}`,background:"#050403",boxShadow:`0 0 40px rgba(200,169,110,.07)`}},
+      flash&&e("div",{style:{position:"absolute",inset:0,background:"#fff8e8",zIndex:10,opacity:.7,borderRadius:14}}),
+      scanning&&e("div",{style:{position:"absolute",inset:0,background:"rgba(14,11,7,.65)",zIndex:8,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:12}},
+        e("div",{style:{width:34,height:34,border:`3px solid rgba(200,169,110,.2)`,borderTopColor:P,borderRadius:"50%",animation:"spin .9s linear infinite"}}),
+        e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:10,color:P,letterSpacing:".18em"}},"READING…")
+      ),
+      e("video",{ref:videoRef,playsInline:true,muted:true,style:{width:"100%",height:"100%",objectFit:"cover"}}),
+      !scanning&&e("div",{style:{position:"absolute",top:"7%",bottom:"7%",width:2,background:`linear-gradient(180deg,transparent,${P},transparent)`,animation:"scanLine 2.8s ease-in-out infinite",zIndex:5}}),
+      ...corners.map((s,i)=>e("div",{key:i,className:"hol-corner",style:{position:"absolute",width:18,height:18,...s}})),
+      e("div",{style:{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",zIndex:3}},
+        e("div",{style:{width:"82%",height:"86%",border:`1px dashed rgba(200,169,110,.1)`,borderRadius:8}})
+      )
+    ),
+
+    // Error message
+    errMsg&&e("div",{style:{fontSize:12,color:"#f87171",textAlign:"center",padding:"6px 12px",background:"rgba(248,113,113,.08)",border:"1px solid rgba(248,113,113,.2)",borderRadius:8,width:"100%"}},errMsg),
+
+    // Scan button row
+    e("div",{style:{display:"flex",alignItems:"center",gap:16}},
+      e("button",{onClick:capture,disabled:scanning||!camReady,className:"hol-btn",style:{width:68,height:68,borderRadius:"50%",background:scanning?"rgba(200,169,110,.12)":`linear-gradient(135deg,${P2},${P})`,border:`3px solid rgba(200,169,110,.28)`,cursor:scanning?"not-allowed":"pointer",fontSize:22,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 0 22px rgba(200,169,110,.25)`,outline:"none",color:"#1a1208"}},
+        scanning?e("div",{style:{width:18,height:18,border:`2px solid rgba(200,169,110,.25)`,borderTopColor:P,borderRadius:"50%",animation:"spin .9s linear infinite"}}):"✦"
+      ),
+      e("div",{style:{display:"flex",flexDirection:"column",gap:5}},
+        e("div",{style:{fontSize:12,color:"#6a5a3a"}},scanning?"Reading card…":"Tap to scan"),
+        addedCount>0&&e("div",{style:{fontSize:11,color:"#4ade80",fontFamily:"'Cinzel',serif"}},addedCount+" added to Quoter ✦"),
+        e("button",{onClick:fullReset,className:"hol-btn",style:{background:"none",border:`1px solid ${BD}`,color:"#4a3a20",borderRadius:7,padding:"4px 12px",fontSize:10,fontFamily:"'Cinzel',serif"}},"✕ Stop Camera")
+      )
+    ),
+
+    // Last scanned result
+    lastScanned&&e("div",{className:"hol-fade",style:{width:"100%",background:SF,border:`1px solid ${BD}`,borderRadius:13,overflow:"hidden"}},
+      lastScanned.inkColor&&e("div",{style:{height:3,background:INK_C[lastScanned.inkColor]||P,opacity:.85}}),
+      e("div",{style:{padding:"14px 16px"}},
+        e("div",{style:{fontSize:9,color:"#5a4a30",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",marginBottom:6}},"Card Identified"),
+        e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}},
+          e("div",null,
+            e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:700,color:P,lineHeight:1.3}},lastScanned.name),
+            e("div",{style:{fontSize:11,color:"#5a4a30",marginTop:4}},lastScanned.set)
+          ),
+          e("div",{style:{fontSize:9,fontWeight:700,color:lastScanned.confidence==="High"?"#4ade80":lastScanned.confidence==="Medium"?P:"#f87171",background:"rgba(0,0,0,.3)",padding:"3px 8px",borderRadius:6,fontFamily:"'Cinzel',serif",letterSpacing:".08em"}},lastScanned.confidence)
+        ),
+        e("div",{style:{display:"flex",gap:6,flexWrap:"wrap",marginBottom:12}},
+          lastScanned.rarity&&e("span",{style:{fontSize:11,color:P,background:"rgba(200,169,110,.1)",border:`1px solid rgba(200,169,110,.2)`,borderRadius:6,padding:"2px 9px"}},lastScanned.rarity),
+          e("span",{style:{fontSize:11,color:COND_C[lastScanned.condition]||"#6b7280",fontWeight:600}},lastScanned.condition),
+          lastScanned.inkColor&&e("span",{style:{fontSize:11,borderRadius:6,padding:"2px 9px",background:(INK_C[lastScanned.inkColor]||P)+"22",color:INK_C[lastScanned.inkColor]||P,border:`1px solid ${(INK_C[lastScanned.inkColor]||P)}44`}},lastScanned.inkColor)
+        ),
+        lastScanned.marketPrice&&e("div",{style:{fontSize:12,color:"#6a5a3a",marginBottom:12,fontStyle:"italic"}},"Est. market: ",e("span",{style:{color:P,fontWeight:700,fontFamily:"'Cinzel',serif"}},"$"+Number(lastScanned.marketPrice).toFixed(2))),
+        lastScanned.conditionNotes&&e("div",{style:{fontSize:11,color:"#4a3a20",marginBottom:12,fontStyle:"italic"}},lastScanned.conditionNotes),
+        e("div",{style:{display:"flex",gap:8}},
+          e("button",{onClick:()=>setLastScanned(null),className:"hol-btn",style:{flex:1,padding:"10px",background:SF,border:`1px solid ${BD}`,color:"#6a5a3a",borderRadius:9,fontFamily:"'Cinzel',serif",fontSize:12}},"Dismiss"),
+          e("button",{onClick:addToQuoter,className:"hol-btn",style:{flex:2,padding:"11px",background:`linear-gradient(135deg,${P2},${P})`,border:"none",color:"#1a1208",borderRadius:9,fontWeight:700,fontFamily:"'Cinzel',serif",fontSize:13}},"✦ Add to Quoter")
+        )
+      )
+    )
+  );
+}
+
+// ── COLLECTION QUOTER ─────────────────────────────────────────────────────────
+function QuoterTab({onDealDone,externalCards,clearExternal}){
+  const [input,setInput]=useState("");
+  const [cards,setCards]=useState([]);
+  const [batchLoading,setBatchLoading]=useState(false);
+  const [batchStatus,setBatchStatus]=useState("");
+  const [offerPct,setOfferPct]=useState(60);
+  const [sellerName,setSellerName]=useState("");
+  const [sessionNote,setSessionNote]=useState("");
+  const [dealDoneModal,setDealDoneModal]=useState(false);
+  const [actualPaid,setActualPaid]=useState("");
+
+  // Absorb cards pushed from scanner
+  useEffect(()=>{
+    if(externalCards&&externalCards.length>0){
+      setCards(prev=>[...prev,...externalCards]);
+      clearExternal();
+    }
+  },[externalCards]);
+
+  const totals=useMemo(()=>{
+    const tm=cards.reduce((s,c)=>s+(parseFloat(c.market)||0),0);
+    const to=tm*(offerPct/100);
+    const priced=cards.filter(c=>parseFloat(c.market)>0).length;
+    return{tm,to,priced};
+  },[cards,offerPct]);
+
+  const addCard=()=>{
+    if(!input.trim())return;
+    setCards(prev=>[...prev,{id:Date.now()+Math.random(),name:input.trim(),set:"",condition:"Near Mint",market:"",rarity:"",confidence:"",looked:false}]);
+    setInput("");
+  };
+
+  const batchLookup=async()=>{
+    if(cards.length===0||batchLoading)return;
+    setBatchLoading(true);
+    setBatchStatus("Looking up "+cards.length+" card"+(cards.length!==1?"s":"")+"…");
+    try{
+      const cardList=cards.map((c,i)=>(i+1)+". "+c.name).join("\n");
+      const text=await callClaude("You are a Disney Lorcana pricing expert with deep TCGplayer knowledge (early 2025).\n\nPrice these "+cards.length+" cards:\n"+cardList+"\n\nReturn ONLY a raw JSON array, no markdown:\n[{\"index\":1,\"found\":true,\"name\":\"full name\",\"set\":\"set\",\"rarity\":\"Common|Uncommon|Rare|Super Rare|Legendary|Enchanted\",\"marketPrice\":4.50,\"confidence\":\"High|Medium|Low\"},{\"index\":2,\"found\":false},...]\n\nPricing (NM TCGplayer): Commons $0.10-1, Rares $1-10, Super Rares $5-35, Legendaries $10-80, Enchanteds $40-600+\nReturn exactly "+cards.length+" entries in order.");
+      const parsed=JSON.parse(text.replace(/```json|```/g,"").trim());
+      setCards(prev=>prev.map((card,idx)=>{
+        const r=parsed[idx];
+        if(!r)return card;
+        if(!r.found)return{...card,looked:true,notFound:true};
+        return{...card,name:r.name||card.name,set:r.set||"",rarity:r.rarity||"",confidence:r.confidence||"Low",market:r.marketPrice!=null?String(r.marketPrice):"",looked:true,notFound:false};
+      }));
+      const found=parsed.filter(r=>r&&r.found).length;
+      setBatchStatus("✦ Priced "+found+" of "+cards.length+" cards");
+      setTimeout(()=>setBatchStatus(""),3500);
+    }catch{
+      setBatchStatus("Lookup failed — check connection and try again");
+      setTimeout(()=>setBatchStatus(""),4000);
+    }
+    setBatchLoading(false);
+  };
+
+  const updateCard=(id,field,val)=>setCards(prev=>prev.map(c=>c.id===id?{...c,[field]:val}:c));
+  const removeCard=id=>setCards(prev=>prev.filter(c=>c.id!==id));
+  const clearAll=()=>{setCards([]);setSellerName("");setSessionNote("");setActualPaid("");setBatchStatus("");};
+
+  const handleDealDone=()=>{if(cards.length===0)return;setActualPaid(totals.to.toFixed(2));setDealDoneModal(true);};
+
+  const confirmDeal=()=>{
+    const paid=parseFloat(actualPaid)||0;
+    const perCard=cards.length>0?paid/cards.length:0;
+    const items=cards.map(c=>({
+      id:Date.now()+Math.random(),card:c.name,set:c.set||"Mixed",condition:c.condition||"Near Mint",
+      qty:1,buyCost:perCard.toFixed(2),marketValue:c.market||"0",status:"held",buyDate:TODAY,
+      sellDate:"",sellPrice:"",platform:"Local",
+      notes:[sellerName?"From: "+sellerName:"",sessionNote].filter(Boolean).join(" · ")||"Collection purchase",
+      priceUpdated:TODAY,listingUrl:""
+    }));
+    onDealDone(items);
+    setDealDoneModal(false);
+    clearAll();
+  };
+
+  const unpriced=cards.filter(c=>!c.market||parseFloat(c.market)===0);
+
+  return e("div",{style:{display:"flex",flexDirection:"column",gap:14}},
+
+    // Offer % + seller + session note
+    e("div",{style:{background:SF,border:`1px solid ${BD}`,borderRadius:13,padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}},
+      e("div",{style:{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
+        e("span",{style:{fontFamily:"'Cinzel',serif",fontSize:11,color:"#9a8060",letterSpacing:".1em",marginRight:4}},"OFFER %"),
+        e("div",{style:{display:"flex",gap:5,flex:1,flexWrap:"wrap"}},
+          ...[40,50,60,70,80].map(pv=>e("button",{key:pv,onClick:()=>setOfferPct(pv),className:"hol-btn",style:{padding:"3px 8px",borderRadius:7,fontSize:11,fontFamily:"'Cinzel',serif",background:offerPct===pv?`linear-gradient(135deg,${P2},${P})`:"rgba(200,169,110,.08)",border:offerPct===pv?"none":`1px solid ${BD}`,color:offerPct===pv?"#1a1208":P,fontWeight:offerPct===pv?700:400}},pv+"%"))
+        ),
+        e("span",{style:{fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:P}},offerPct+"%")
+      ),
+      e("input",{type:"range",min:10,max:90,step:5,value:offerPct,onChange:ev=>setOfferPct(Number(ev.target.value))}),
+      e("div",{style:{display:"flex",gap:8}},
+        e("input",{className:"inp",value:sellerName,onChange:ev=>setSellerName(ev.target.value),placeholder:"Seller name (optional)…",style:{flex:1,fontSize:13,padding:"7px 12px"}}),
+        e("input",{className:"inp",value:sessionNote,onChange:ev=>setSessionNote(ev.target.value),placeholder:"Session note…",style:{flex:1,fontSize:13,padding:"7px 12px"}})
+      )
+    ),
+
+    // Card input
+    e("div",{style:{display:"flex",gap:8}},
+      e("input",{className:"inp",value:input,onChange:ev=>setInput(ev.target.value),onKeyDown:ev=>{if(ev.key==="Enter")addCard();},placeholder:"Type a card name and press Enter…",style:{flex:1}}),
+      e("button",{onClick:addCard,disabled:!input.trim(),className:"hol-btn",style:{background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:9,padding:"9px 16px",fontWeight:700,fontSize:13,fontFamily:"'Cinzel',serif",whiteSpace:"nowrap",opacity:!input.trim()?0.4:1}},"+ Add")
+    ),
+
+    // Card list
+    cards.length>0&&e("div",{className:"hol-fade",style:{display:"flex",flexDirection:"column",background:SF,border:`1px solid ${BD}`,borderRadius:13,overflow:"hidden"}},
+
+      // Batch lookup bar
+      e("div",{style:{padding:"10px 12px",background:"rgba(200,169,110,.07)",borderBottom:`1px solid ${BD}`,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap"}},
+        e("button",{onClick:batchLookup,disabled:batchLoading||unpriced.length===0,className:"hol-btn",style:{background:batchLoading||unpriced.length===0?"rgba(200,169,110,.1)":`linear-gradient(135deg,${P2},${P})`,color:batchLoading||unpriced.length===0?"#5a4a30":"#1a1208",border:"none",borderRadius:8,padding:"7px 14px",fontWeight:700,fontSize:12,fontFamily:"'Cinzel',serif",display:"flex",alignItems:"center",gap:7,whiteSpace:"nowrap",opacity:unpriced.length===0?0.5:1}},
+          batchLoading?[e(Spin,{key:"s"})," Looking up…"]:"✦ Look Up All Prices"+(unpriced.length>0?" ("+unpriced.length+")":"")
+        ),
+        batchStatus&&e("span",{style:{fontSize:12,color:batchStatus.startsWith("✦")?"#c8a96e":"#f87171",fontStyle:"italic"}},batchStatus),
+        !batchStatus&&unpriced.length===0&&cards.length>0&&e("span",{style:{fontSize:11,color:"#4ade80",fontStyle:"italic"}},"All cards priced ✦"),
+        !batchLoading&&!batchStatus&&unpriced.length>0&&e("span",{style:{fontSize:11,color:"#5a4a30",fontStyle:"italic"}},"Enter prices manually or tap lookup")
+      ),
+
+      // Headers
+      e("div",{style:{display:"grid",gridTemplateColumns:"1fr 82px 76px 22px",gap:6,padding:"8px 12px",background:"rgba(200,169,110,.04)",borderBottom:`1px solid ${BD}`}},
+        e("div",{style:{fontSize:9,color:"#4a3a20",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Cinzel',serif"}},"Card"),
+        e("div",{style:{fontSize:9,color:"#4a3a20",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",textAlign:"right"}},"Market $"),
+        e("div",{style:{fontSize:9,color:"#4a3a20",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",textAlign:"right"}},"Offer"),
+        e("div")
+      ),
+
+      // Rows
+      ...cards.map((card,idx)=>{
+        const mv=parseFloat(card.market);
+        const offer=(!isNaN(mv)&&mv>0)?mv*(offerPct/100):null;
+        return e("div",{key:card.id,className:"hol-item",style:{display:"grid",gridTemplateColumns:"1fr 82px 76px 22px",gap:6,alignItems:"center",padding:"10px 12px",borderBottom:idx<cards.length-1?"1px solid rgba(200,169,110,.06)":"none",transition:"background .15s"},onMouseEnter:ev=>ev.currentTarget.style.background="rgba(200,169,110,.03)",onMouseLeave:ev=>ev.currentTarget.style.background="transparent"},
+          e("div",null,
+            e("div",{style:{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}},
+              e("span",{style:{fontSize:13,fontWeight:600,color:card.notFound?"#f87171":"#e8dcc8",lineHeight:1.2}},card.name),
+              card.confidence&&e("span",{style:{fontSize:9,color:card.confidence==="High"?"#4ade80":card.confidence==="Medium"?P:"#fb923c",fontFamily:"'Cinzel',serif"}},card.confidence==="High"?"✦":card.confidence==="Medium"?"◆":"◇")
+            ),
+            e("div",{style:{display:"flex",gap:5,marginTop:3,alignItems:"center",flexWrap:"wrap"}},
+              card.set&&e("span",{style:{fontSize:9,color:"#5a4a30"}},card.set),
+              card.rarity&&e("span",{style:{fontSize:9,color:P,background:"rgba(200,169,110,.1)",borderRadius:4,padding:"1px 5px"}},card.rarity),
+              e("select",{value:card.condition,onChange:ev=>updateCard(card.id,"condition",ev.target.value),style:{fontSize:9,background:"none",border:"none",color:COND_C[card.condition]||"#6b7280",fontFamily:"'Crimson Pro',serif",cursor:"pointer",padding:0,outline:"none",fontWeight:600}},
+                ...CONDITIONS.map(c=>e("option",{key:c,style:{background:"#1a1208",color:"#e8dcc8"}},c))
+              ),
+              card.notFound&&e("span",{style:{fontSize:9,color:"#f87171"}},"Not found")
+            )
+          ),
+          e("input",{className:"inp-sm",type:"number",step:"0.01",min:"0",placeholder:"0.00",value:card.market,onChange:ev=>updateCard(card.id,"market",ev.target.value)}),
+          e("div",{style:{textAlign:"right",fontFamily:"'Cinzel',serif",fontSize:13,fontWeight:700,color:offer?P:"#3a3020"}},offer?"$"+offer.toFixed(2):"—"),
+          e("button",{onClick:()=>removeCard(card.id),className:"hol-btn",style:{background:"none",border:"none",color:"#4a3a20",fontSize:13,padding:0,lineHeight:1}},"✕")
+        );
+      }),
+
+      // Totals
+      e("div",{style:{background:"rgba(200,169,110,.07)",borderTop:`1px solid ${BD}`,padding:"12px 14px",display:"flex",flexDirection:"column",gap:6}},
+        e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:9,color:"#7a6a50",letterSpacing:".14em",textTransform:"uppercase"}},"✦ Totals · "+totals.priced+"/"+cards.length+" priced"),
+        e("div",{style:{display:"grid",gridTemplateColumns:"1fr 82px 76px 22px",gap:6,alignItems:"center"}},
+          e("div",{style:{fontSize:12,color:"#6a5a3a",fontStyle:"italic"}},"Total market value"),
+          e("div",{style:{textAlign:"right",fontFamily:"'Cinzel',serif",fontSize:14,fontWeight:600,color:"#e8dcc8"}},totals.priced>0?"$"+totals.tm.toFixed(2):"—"),
+          e("div"),e("div")
+        ),
+        e(Divider),
+        e("div",{style:{display:"grid",gridTemplateColumns:"1fr 82px 76px 22px",gap:6,alignItems:"center"}},
+          e("div",{style:{fontSize:12,color:"#6a5a3a",fontStyle:"italic"}},"Your offer ("+offerPct+"%)"),
+          e("div"),
+          e("div",{style:{textAlign:"right",fontFamily:"'Cinzel',serif",fontSize:18,fontWeight:700,color:P}},totals.priced>0?"$"+totals.to.toFixed(2):"—"),
+          e("div")
+        )
+      )
+    ),
+
+    // Action buttons
+    cards.length>0&&e("div",{style:{display:"flex",gap:8}},
+      e("button",{onClick:clearAll,className:"hol-btn",style:{flex:1,padding:"11px 8px",background:"none",border:"1px solid rgba(239,68,68,.2)",color:"rgba(248,113,113,.6)",borderRadius:11,fontSize:12,fontFamily:"'Cinzel',serif"}},"Clear"),
+      e("button",{onClick:handleDealDone,disabled:totals.priced===0,className:"hol-btn",style:{flex:3,padding:"13px 8px",background:totals.priced>0?`linear-gradient(135deg,${P2},${P})`:"rgba(200,169,110,.12)",border:"none",color:totals.priced>0?"#1a1208":"#5a4a30",borderRadius:11,fontSize:14,fontWeight:700,fontFamily:"'Cinzel',serif",letterSpacing:".04em",transition:"all .2s"}},"✦ Deal Done — Add to Inventory")
+    ),
+
+    // Empty state
+    cards.length===0&&e("div",{style:{textAlign:"center",padding:"40px 20px"}},
+      e("div",{style:{fontSize:30,marginBottom:12,opacity:.3}},"📜"),
+      e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:14,color:"#5a4a30",marginBottom:8}},"Add cards to get started"),
+      e("div",{style:{fontSize:13,color:"#3a3020",lineHeight:1.8}},"Type names manually or scan cards",e("br"),"with the Scanner tab.",e("br"),e("span",{style:{color:P}},"Look Up All Prices")," fills in AI estimates.",e("br"),e("span",{style:{color:P}},"Deal Done")," saves the whole batch to your Vault.")
+    ),
+
+    // Deal Done modal
+    e(Modal,{open:dealDoneModal,onClose:()=>setDealDoneModal(false)},
+      e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+        e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:700,color:P}},"✦ Confirm Deal"),
+        e("button",{onClick:()=>setDealDoneModal(false),style:{background:"none",border:"none",color:"#5a4a30",fontSize:18,cursor:"pointer"}},"✕")
+      ),
+      e("div",{style:{background:"rgba(200,169,110,.07)",border:`1px solid ${BD}`,borderRadius:12,padding:"13px 15px",marginBottom:14}},
+        e("div",{style:{fontSize:13,color:"#7a6a50",marginBottom:7}},cards.length+" card"+(cards.length!==1?"s":"")+" · market ",e("span",{style:{color:P,fontWeight:700}},"$"+totals.tm.toFixed(2))),
+        e("div",{style:{maxHeight:130,overflowY:"auto",display:"flex",flexDirection:"column",gap:3}},
+          ...cards.map(c=>e("div",{key:c.id,style:{display:"flex",justifyContent:"space-between",fontSize:12,color:"#9a8060"}},e("span",null,c.name),e("span",{style:{color:P}},c.market?"$"+parseFloat(c.market).toFixed(2):"—")))
+        )
+      ),
+      e(Field,{label:"What did you actually pay?"},e("input",{className:"inp",type:"number",step:"0.01",min:"0",value:actualPaid,onChange:ev=>setActualPaid(ev.target.value),placeholder:totals.to.toFixed(2)})),
+      e("div",{style:{fontSize:11,color:"#4a3a20",marginBottom:14,fontStyle:"italic"}},"Cost split evenly across "+cards.length+" card"+(cards.length!==1?"s":"")+". Edit in Vault anytime."),
+      (sellerName||sessionNote)&&e("div",{style:{fontSize:12,color:"#5a4a30",marginBottom:12}},
+        sellerName&&["Seller: ",e("span",{key:"s",style:{color:P}},sellerName)],
+        sellerName&&sessionNote&&" · ",
+        sessionNote&&e("span",{key:"n",style:{color:P}},sessionNote)
+      ),
+      e("div",{style:{display:"flex",gap:8}},
+        e("button",{onClick:()=>setDealDoneModal(false),className:"hol-btn",style:{flex:1,padding:"11px",background:SF,border:`1px solid ${BD}`,color:"#6a5a3a",borderRadius:10,fontFamily:"'Cinzel',serif",fontSize:12}},"Cancel"),
+        e("button",{onClick:confirmDeal,className:"hol-btn",style:{flex:2,padding:"13px",background:`linear-gradient(135deg,${P2},${P})`,border:"none",color:"#1a1208",borderRadius:10,fontWeight:700,fontFamily:"'Cinzel',serif",fontSize:14}},"✦ Confirm & Add to Vault")
+      )
+    )
+  );
+}
+
+// ── VAULT TAB ─────────────────────────────────────────────────────────────────
+function VaultTab({items,setItems}){
+  const BLANK={card:"",set:"The First Chapter",condition:"Near Mint",qty:1,buyCost:"",marketValue:"",status:"held",buyDate:TODAY,sellDate:"",sellPrice:"",platform:"Local",notes:"",priceUpdated:TODAY,listingUrl:""};
+  const [showModal,setShowModal]=useState(false);
+  const [editId,setEditId]=useState(null);
+  const [filter,setFilter]=useState("all");
+  const [sortBy,setSortBy]=useState("buyDate");
+  const [form,setForm]=useState(BLANK);
+
+  const openAdd=()=>{setForm(BLANK);setEditId(null);setShowModal(true);};
+  const openEdit=item=>{setForm({...item});setEditId(item.id);setShowModal(true);};
+  const save=()=>{
+    if(!form.card.trim())return;
+    setItems(editId!==null?items.map(i=>i.id===editId?{...form,id:editId}:i):[...items,{...form,id:Date.now()}]);
+    setShowModal(false);
+  };
+  const del=id=>setItems(items.filter(i=>i.id!==id));
+  const sf=(k,v)=>setForm(f=>({...f,[k]:v}));
+
+  const stats=useMemo(()=>{
+    const invested=items.reduce((s,i)=>s+Number(i.buyCost||0),0);
+    const heldMkt=items.filter(i=>i.status!=="sold").reduce((s,i)=>s+Number(i.marketValue||0),0);
+    const heldCost=items.filter(i=>i.status!=="sold").reduce((s,i)=>s+Number(i.buyCost||0),0);
+    const soldRev=items.filter(i=>i.status==="sold").reduce((s,i)=>s+Number(i.sellPrice||0),0);
+    const soldCost=items.filter(i=>i.status==="sold").reduce((s,i)=>s+Number(i.buyCost||0),0);
+    const realized=soldRev-soldCost,unrealized=heldMkt-heldCost;
+    const roi=soldCost>0?((realized/soldCost)*100).toFixed(1):null;
+    return{invested,heldMkt,realized,unrealized,roi};
+  },[items]);
+
+  const filtered=useMemo(()=>{
+    let out=filter==="all"?items:items.filter(i=>i.status===filter);
+    return[...out].sort((a,b)=>{
+      if(sortBy==="profit")return(Number(b.marketValue)-Number(b.buyCost))-(Number(a.marketValue)-Number(a.buyCost));
+      if(sortBy==="value")return Number(b.marketValue)-Number(a.marketValue);
+      if(sortBy==="card")return a.card.localeCompare(b.card);
+      return new Date(b.buyDate)-new Date(a.buyDate);
+    });
+  },[items,filter,sortBy]);
+
+  const plColor=n=>n>0?"#4ade80":n<0?"#f87171":"#5a4a30";
+  const daysSince=d=>d?Math.floor((Date.now()-new Date(d))/86400000):null;
+  const staleColor=d=>{const n=daysSince(d);return!n||n<=3?"#4ade80":n<=7?P:"#f87171";};
+  const staleLabel=d=>{const n=daysSince(d);return n===null?"Never":n===0?"Today":n===1?"1d ago":n+"d ago";};
+  const quickPrice=id=>{const v=prompt("New market value ($):");if(!v)return;const n=parseFloat(v);if(isNaN(n))return;setItems(items.map(i=>i.id===id?{...i,marketValue:n,priceUpdated:TODAY}:i));};
+
+  const FILTERS=[{k:"all",l:"All"},{k:"held",l:"Held"},{k:"listed-ebay",l:"eBay"},{k:"listed-tcgplayer",l:"TCGplayer"},{k:"sold",l:"Sold"}];
+  const COL="1.8fr .85fr .75fr .75fr .75fr .85fr .75fr 64px";
+
+  return e("div",null,
+    e("div",{style:{display:"flex",gap:9,marginBottom:16,flexWrap:"wrap"}},
+      e(StatCard,{label:"Invested",value:fmt(stats.invested),accent:"#6366f1"}),
+      e(StatCard,{label:"Market Value",value:fmt(stats.heldMkt),sub:"held",accent:"#818cf8"}),
+      e(StatCard,{label:"Unrealized P&L",value:fmt(stats.unrealized),accent:stats.unrealized>=0?"#22c55e":"#ef4444"}),
+      e(StatCard,{label:"Realized Profit",value:fmt(stats.realized),sub:stats.roi?stats.roi+"% ROI":"no sales yet",accent:P})
+    ),
+    e("div",{style:{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}},
+      ...FILTERS.map(({k,l})=>e("button",{key:k,onClick:()=>setFilter(k),className:"hol-btn",style:{background:filter===k?"rgba(200,169,110,.12)":SF,border:filter===k?`1px solid rgba(200,169,110,.4)`:`1px solid ${BD}`,color:filter===k?P:"#6a5a3a",borderRadius:8,padding:"5px 11px",fontSize:11,fontFamily:"'Cinzel',serif",letterSpacing:".04em"}},l)),
+      e("div",{style:{marginLeft:"auto",display:"flex",gap:7,alignItems:"center"}},
+        e("select",{value:sortBy,onChange:ev=>setSortBy(ev.target.value),style:{background:SF,border:`1px solid ${BD}`,borderRadius:7,padding:"5px 9px",color:"#9a8060",fontSize:11,fontFamily:"'Cinzel',serif",outline:"none"}},
+          e("option",{value:"buyDate"},"Date"),e("option",{value:"profit"},"P&L"),e("option",{value:"value"},"Value"),e("option",{value:"card"},"Name")
+        ),
+        e("button",{onClick:openAdd,className:"hol-btn",style:{background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:8,padding:"6px 14px",fontWeight:700,fontSize:11,fontFamily:"'Cinzel',serif"}},"✦ Add")
+      )
+    ),
+    e("div",{style:{background:SF,border:`1px solid ${BD}`,borderRadius:13,overflow:"hidden"}},
+      e("div",{style:{display:"grid",gridTemplateColumns:COL,padding:"8px 12px",background:"rgba(200,169,110,.06)",borderBottom:`1px solid ${BD}`,fontSize:9,color:"#4a3a20",letterSpacing:".14em",textTransform:"uppercase",fontFamily:"'Cinzel',serif",fontWeight:700}},
+        e("span",null,"Card"),e("span",null,"Cond."),e("span",null,"Cost"),e("span",null,"Market"),e("span",null,"P&L"),e("span",null,"Status"),e("span",null,"Updated"),e("span")
+      ),
+      filtered.length===0&&e("div",{style:{padding:36,textAlign:"center",color:"#3a3020",fontSize:14,fontStyle:"italic"}},"No cards in this view."),
+      ...filtered.map((item,idx)=>{
+        const pl=item.status==="sold"?Number(item.sellPrice||0)-Number(item.buyCost||0):Number(item.marketValue||0)-Number(item.buyCost||0);
+        return e("div",{key:item.id,className:"hol-row",style:{display:"grid",gridTemplateColumns:COL,padding:"11px 12px",alignItems:"center",borderBottom:idx<filtered.length-1?"1px solid rgba(200,169,110,.06)":"none",transition:"background .15s"}},
+          e("div",null,
+            e("div",{style:{fontWeight:600,fontSize:12,color:"#e8dcc8"}},item.card),
+            e("div",{style:{fontSize:10,color:"#4a3a20",marginTop:1}},item.set+" · "+item.buyDate),
+            item.notes&&e("div",{style:{fontSize:9,color:"#3a2a10",marginTop:1,fontStyle:"italic"}},item.notes)
+          ),
+          e("div",{style:{fontSize:10,color:"#6a5a3a"}},item.condition),
+          e("div",{style:{fontSize:11,color:"#9a8060"}},fmt(item.buyCost)),
+          e("div",{style:{fontSize:11,color:item.status==="sold"?"#fb923c":"#9a8060"}},item.status==="sold"?fmt(item.sellPrice):fmt(item.marketValue)),
+          e("div",{style:{fontSize:11,fontWeight:700,color:plColor(pl)}},(pl>0?"+":"")+fmt(pl)),
+          e("div",null,e(Badge,{status:item.status})),
+          e("div",null,item.status!=="sold"?e("div",{style:{display:"flex",flexDirection:"column",gap:2}},
+            e("span",{style:{fontSize:9,color:staleColor(item.priceUpdated),fontWeight:700,fontFamily:"'Cinzel',serif"}},staleLabel(item.priceUpdated)),
+            e("button",{onClick:()=>quickPrice(item.id),className:"hol-btn",style:{background:"rgba(200,169,110,.08)",border:`1px solid ${BD}`,color:P,borderRadius:4,padding:"1px 5px",fontSize:9,fontFamily:"'Cinzel',serif"}},"↑")
+          ):e("span",{style:{fontSize:9,color:"#3a3020"}},"—")),
+          e("div",{style:{display:"flex",gap:3}},
+            e("button",{onClick:()=>openEdit(item),className:"hol-btn",style:{background:"rgba(200,169,110,.07)",border:`1px solid ${BD}`,color:"#9a8060",borderRadius:5,padding:"3px 6px",fontSize:10,fontFamily:"'Cinzel',serif"}},"Edit"),
+            e("button",{onClick:()=>del(item.id),className:"hol-btn",style:{background:"rgba(239,68,68,.08)",border:"none",color:"#f87171",borderRadius:5,padding:"3px 5px",fontSize:10}},"✕")
+          )
+        );
+      })
+    ),
+    e("div",{style:{marginTop:8,fontSize:10,color:"#3a3020",textAlign:"center",fontFamily:"'Cinzel',serif",letterSpacing:".1em"}},items.length+" CARD"+(items.length!==1?"S":"")+" IN THE VAULT"),
+
+    e(Modal,{open:showModal,onClose:()=>setShowModal(false)},
+      e("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}},
+        e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:700,color:P}},editId!==null?"Edit Entry":"New Entry"),
+        e("button",{onClick:()=>setShowModal(false),style:{background:"none",border:"none",color:"#5a4a30",fontSize:18,cursor:"pointer"}},"✕")
+      ),
+      e("div",{style:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0 12px"}},
+        e("div",{style:{gridColumn:"1 / -1"}},e(Field,{label:"Card Name"},e("input",{className:"inp",value:form.card,onChange:ev=>sf("card",ev.target.value),placeholder:"e.g. Elsa - Spirit of Winter"}))),
+        e(Field,{label:"Set"},e("select",{className:"inp",value:form.set,onChange:ev=>sf("set",ev.target.value)},...SETS.map(s=>e("option",{key:s},s)))),
+        e(Field,{label:"Condition"},e("select",{className:"inp",value:form.condition,onChange:ev=>sf("condition",ev.target.value)},...CONDITIONS.map(c=>e("option",{key:c},c)))),
+        e(Field,{label:"Buy Cost ($)"},e("input",{className:"inp",type:"number",step:"0.01",value:form.buyCost,onChange:ev=>sf("buyCost",ev.target.value),placeholder:"0.00"})),
+        e(Field,{label:"Market Value ($)"},e("input",{className:"inp",type:"number",step:"0.01",value:form.marketValue,onChange:ev=>sf("marketValue",ev.target.value),placeholder:"0.00"})),
+        e(Field,{label:"Buy Date"},e("input",{className:"inp",type:"date",value:form.buyDate,onChange:ev=>sf("buyDate",ev.target.value)})),
+        e(Field,{label:"Price Updated"},e("input",{className:"inp",type:"date",value:form.priceUpdated||"",onChange:ev=>sf("priceUpdated",ev.target.value)})),
+        e(Field,{label:"Platform"},e("select",{className:"inp",value:form.platform,onChange:ev=>sf("platform",ev.target.value)},...PLATFORMS.map(p=>e("option",{key:p},p)))),
+        e(Field,{label:"Status"},e("select",{className:"inp",value:form.status,onChange:ev=>sf("status",ev.target.value)},
+          e("option",{value:"held"},"Held"),e("option",{value:"listed-ebay"},"Listed · eBay"),e("option",{value:"listed-tcgplayer"},"Listed · TCGplayer"),e("option",{value:"sold"},"Sold")
+        )),
+        (form.status==="listed-ebay"||form.status==="listed-tcgplayer")&&e("div",{style:{gridColumn:"1 / -1"}},e(Field,{label:"Listing URL"},e("input",{className:"inp",value:form.listingUrl||"",onChange:ev=>sf("listingUrl",ev.target.value),placeholder:"https://…"}))),
+        form.status==="sold"&&e(Field,{label:"Sell Price ($)"},e("input",{className:"inp",type:"number",step:"0.01",value:form.sellPrice,onChange:ev=>sf("sellPrice",ev.target.value),placeholder:"0.00"})),
+        form.status==="sold"&&e(Field,{label:"Sell Date"},e("input",{className:"inp",type:"date",value:form.sellDate,onChange:ev=>sf("sellDate",ev.target.value)})),
+        e("div",{style:{gridColumn:"1 / -1"}},e(Field,{label:"Notes"},e("input",{className:"inp",value:form.notes,onChange:ev=>sf("notes",ev.target.value),placeholder:"Any notes…"})))
+      ),
+      e("div",{style:{display:"flex",gap:8,marginTop:8}},
+        e("button",{onClick:()=>setShowModal(false),className:"hol-btn",style:{flex:1,background:SF,border:`1px solid ${BD}`,color:"#6a5a3a",borderRadius:10,padding:"10px",fontFamily:"'Cinzel',serif",fontSize:12}},"Cancel"),
+        e("button",{onClick:save,className:"hol-btn",style:{flex:2,background:`linear-gradient(135deg,${P2},${P})`,border:"none",color:"#1a1208",borderRadius:10,padding:"11px",fontWeight:700,fontFamily:"'Cinzel',serif",fontSize:13}},editId!==null?"Save Changes":"Add to Vault")
+      )
+    )
+  );
+}
+
+// ── ROOT APP ──────────────────────────────────────────────────────────────────
+function App(){
+  const [tab,setTab]=useState("scanner");
+  const [inventory,setInventory]=useState(()=>loadLS("hol-inventory",[{id:1,card:"Starter Collection",set:"Mixed",condition:"Near Mint",qty:1,buyCost:50,marketValue:70,status:"held",buyDate:TODAY,sellDate:"",sellPrice:"",platform:"Local",notes:"First collection purchase",priceUpdated:TODAY,listingUrl:""}]));
+  const [toastMsg,setToastMsg]=useState("");
+  const [pendingCards,setPendingCards]=useState([]);// cards scanned → waiting to be added to quoter
+
+  // Persist inventory to localStorage whenever it changes
+  useEffect(()=>saveLS("hol-inventory",inventory),[inventory]);
+
+  const showToast=msg=>{setToastMsg(msg);setTimeout(()=>setToastMsg(""),4000);};
+
+  const handleDealDone=newItems=>{
+    setInventory(prev=>[...prev,...newItems]);
+    showToast("✦ "+newItems.length+" card"+(newItems.length!==1?"s":"")+" added to your Vault");
+    setTab("vault");
+  };
+
+  const handleScannerAdd=card=>{
+    setPendingCards(prev=>[...prev,card]);
+    showToast("✦ "+card.name+" added to Quoter");
+    // auto-switch to quoter so user can see it
+    setTab("quoter");
+  };
+
+  const clearPending=()=>setPendingCards([]);
+
+  const heldCount=inventory.filter(i=>i.status==="held").length;
+
+  const TABS=[
+    {key:"scanner",label:"📷 Scanner"},
+    {key:"quoter",label:"✦ Quoter"},
+    {key:"vault",label:"⊞ Vault"},
+  ];
+
+  return e("div",{style:{minHeight:"100vh",background:"#0e0b07",color:"#e8dcc8",fontFamily:"'Crimson Pro',Georgia,serif",display:"flex",flexDirection:"column",maxWidth:700,margin:"0 auto"}},
+
+    // Header
+    e("div",{style:{background:"rgba(14,11,7,.97)",backdropFilter:"blur(8px)",borderBottom:`1px solid ${BD}`,padding:"12px 18px",display:"flex",alignItems:"center",gap:12,position:"sticky",top:0,zIndex:20}},
+      e("div",{className:"hol-float"},e(Logo,{size:40})),
+      e("div",null,
+        e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,fontWeight:700,color:P,letterSpacing:".05em",lineHeight:1}},"House of Lore"),
+        e("div",{style:{fontSize:10,color:"#5a4a30",letterSpacing:".16em",textTransform:"uppercase"}},"Lorcana Tools")
+      )
+    ),
+
+    // Tabs
+    e("div",{style:{display:"flex",borderBottom:`1px solid ${BD}`,background:"rgba(14,11,7,.6)",position:"sticky",top:64,zIndex:19}},
+      ...TABS.map(({key,label})=>e("button",{key,onClick:()=>setTab(key),className:"hol-btn",style:{flex:1,padding:"11px 4px",background:"none",border:"none",borderBottom:tab===key?`2px solid ${P}`:"2px solid transparent",color:tab===key?P:"#5a4a30",fontFamily:"'Cinzel',serif",fontSize:12,fontWeight:tab===key?700:400,letterSpacing:".04em",transition:"all .2s",position:"relative"}},
+        label,
+        key==="vault"&&heldCount>0&&e("span",{style:{position:"absolute",top:7,right:8,background:P,color:"#1a1208",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",fontFamily:"'Cinzel',serif"}},heldCount),
+        key==="quoter"&&pendingCards.length>0&&e("span",{style:{position:"absolute",top:7,right:8,background:"#4ade80",color:"#0e0b07",borderRadius:10,fontSize:9,fontWeight:700,padding:"1px 5px",fontFamily:"'Cinzel',serif"}},pendingCards.length)
+      ))
+    ),
+
+    // Toast
+    toastMsg&&e("div",{style:{position:"fixed",bottom:24,left:"50%",transform:"translateX(-50%)",background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",borderRadius:12,padding:"11px 20px",fontSize:13,fontWeight:700,fontFamily:"'Cinzel',serif",zIndex:999,boxShadow:"0 4px 20px rgba(0,0,0,.5)",whiteSpace:"nowrap",pointerEvents:"none"}},toastMsg),
+
+    // Content
+    e("div",{style:{flex:1,padding:tab==="vault"?"16px 16px 48px":tab==="quoter"?"16px 16px 48px":"0 0 48px",overflowX:"hidden"}},
+      tab==="scanner"&&e(ScannerTab,{onAddToQuoter:handleScannerAdd}),
+      tab==="quoter"&&e(QuoterTab,{onDealDone:handleDealDone,externalCards:pendingCards,clearExternal:clearPending}),
+      tab==="vault"&&e(VaultTab,{items:inventory,setItems:setInventory})
+    ),
+
+    // Footer
+    e("div",{style:{textAlign:"center",padding:"10px 0",borderTop:`1px solid ${BD}`,fontFamily:"'Cinzel',serif",fontSize:9,color:"#2a2010",letterSpacing:".22em"}},"HOUSE OF LORE · LORCANA TOOLS")
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+</script>
+</body>
+</html>
