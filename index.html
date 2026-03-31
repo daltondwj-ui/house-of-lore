@@ -218,11 +218,16 @@ function ScannerTab({onAddToQuoter}){
     e("div",{style:{fontSize:12,color:"#3a3020"}},"Requires camera permission in Safari")
   );
 
-  if(phase==="error") return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:32,gap:20,textAlign:"center"}},
-    e("div",{style:{fontSize:44,opacity:.5}},"📜"),
-    e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,color:"#c87171",marginBottom:6}},"The Lore is Unclear"),
-    e("div",{style:{fontSize:13,color:"#5a4a30",lineHeight:1.7}},errMsg),
-    e("button",{onClick:()=>setPhase("idle"),className:"hol-btn",style:{marginTop:8,background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:10,padding:"11px 28px",fontSize:13,fontWeight:700,fontFamily:"'Cinzel',serif"}},"Try Again")
+  if(phase==="error") return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"28px 20px",gap:14,textAlign:"center"}},
+    e("div",{style:{fontSize:40,opacity:.5}},"📷"),
+    e("div",{style:{fontFamily:"'Cinzel',serif",fontSize:16,color:"#c87171",marginBottom:4}},"Camera Access Needed"),
+    e("div",{style:{background:SF,border:`1px solid ${BD}`,borderRadius:12,padding:"14px 16px",textAlign:"left",width:"100%",fontSize:13,color:"#9a8060",lineHeight:2}},
+      e("div",null,"1. Tap the ",e("span",{style:{color:P,fontWeight:600}},"\u22ef menu")," at the bottom of Safari"),
+      e("div",null,"2. Tap ",e("span",{style:{color:P,fontWeight:600}},"Website Settings")),
+      e("div",null,"3. Set ",e("span",{style:{color:P,fontWeight:600}},"Camera")," \u2192 ",e("span",{style:{color:"#4ade80",fontWeight:600}},"Allow")),
+      e("div",null,"4. Return here and tap Try Again")
+    ),
+    e("button",{onClick:()=>setPhase("idle"),className:"hol-btn",style:{background:`linear-gradient(135deg,${P2},${P})`,color:"#1a1208",border:"none",borderRadius:10,padding:"12px 32px",fontSize:13,fontWeight:700,fontFamily:"'Cinzel',serif"}},"Try Again")
   );
 
   return e("div",{style:{display:"flex",flexDirection:"column",alignItems:"center",width:"100%",padding:"12px 14px",gap:10}},
@@ -427,7 +432,8 @@ function QuoterTab({onDealDone,externalCards,clearExternal}){
               e("select",{value:card.condition,onChange:ev=>updateCard(card.id,"condition",ev.target.value),style:{fontSize:9,background:"none",border:"none",color:COND_C[card.condition]||"#6b7280",fontFamily:"'Crimson Pro',serif",cursor:"pointer",padding:0,outline:"none",fontWeight:600}},
                 ...CONDITIONS.map(c=>e("option",{key:c,style:{background:"#1a1208",color:"#e8dcc8"}},c))
               ),
-              card.notFound&&e("span",{style:{fontSize:9,color:"#f87171"}},"Not found")
+              card.notFound&&e("span",{style:{fontSize:9,color:"#f87171"}},"Not found"),
+              e("a",{href:"https://www.tcgplayer.com/search/lorcana/product?q="+encodeURIComponent((card.name+" "+(card.set||"")).trim())+"&view=grid",target:"_blank",rel:"noopener noreferrer",style:{fontSize:9,color:"#38bdf8",textDecoration:"none",fontFamily:"'Cinzel',serif",letterSpacing:".04em",fontWeight:600,whiteSpace:"nowrap"}},"TCG ↗")
             )
           ),
           e("input",{className:"inp-sm",type:"number",step:"0.01",min:"0",placeholder:"0.00",value:card.market,onChange:ev=>updateCard(card.id,"market",ev.target.value)}),
